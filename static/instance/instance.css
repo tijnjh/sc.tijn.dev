@@ -1,0 +1,29 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap");
+
+:root {
+  --accent: seagreen !important;
+  --primary: #151515;
+  --secondary: #252525;
+  --0: #303030;
+}
+
+h4,
+h5,
+h6 {
+  font-family: "dm mono", monospace, system-ui !important;
+  font-weight: normal !important;
+}
+
+select,
+input,
+.btn,
+.listing,
+details > summary {
+  border-radius: 4px;
+}
+
+#favorites {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
