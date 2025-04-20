@@ -176,6 +176,57 @@ templ Track(prefs cfg.Preferences, t sc.Track, stream string, displayErr string,
 			<a class="btn" href={ templ.SafeURL("/_/restream" + t.Href() + "?metadata=true") } download={ t.Permalink + "." + toExt(*downloadAudio) }>download</a>
 		</div>
 	}
+
+	<div id="addToFavorites" class="listing" style="width: fit-content; margin-block-start: 1rem; cursor: pointer;"></div>
+	<div id="track-data" data-title={ t.Title } data-artist={ t.Author.Username } data-artwork-url={ t.Artwork }></div>
+	<script>
+		const addToFavoritesBtn = document.getElementById("addToFavorites");
+		const elTrackData = document.getElementById("track-data");
+
+		if (!localStorage.favorites) {
+			localStorage.favorites = "";
+		}
+
+		let isSongFavorited;
+
+		function update() {
+			isSongFavorited = localStorage.favorites.includes(location.pathname);
+			if (isSongFavorited) {
+				addToFavoritesBtn.textContent = "remove from favorites";
+			} else {
+				addToFavoritesBtn.textContent = "add to favorites";
+			}
+		}
+
+		update();
+
+		addToFavoritesBtn.onclick = () => {
+			if (isSongFavorited) {
+				localStorage.favorites = localStorage.favorites.replace(`${location.pathname},`, "");
+			} else {
+				localStorage.favorites += `${location.pathname},`;
+			}
+			update();
+		};
+
+		const { title, artist, artworkUrl } = elTrackData.dataset;
+
+		if ("mediaSession" in navigator) {
+			navigator.mediaSession.metadata = new MediaMetadata({
+				title: title,
+				artist: artist,
+				album: "Soundcloak",
+				artwork: [
+				{
+					src: artworkUrl,
+					sizes: "500x500",
+					type: "image/jpeg",
+				},
+				],
+			});
+		}
+	</script>
+
 	if t.Genre != "" {
 		<a href={ templ.SafeURL("/tags/" + t.Genre) }><p class="tag">{ t.Genre }</p></a>
 	}
