@@ -18,9 +18,9 @@ import (
 )
 
 type clientIdCache struct {
+	NextCheck time.Time
 	ClientID  string
 	Version   string
-	NextCheck time.Time
 }
 
 var ClientIDCache clientIdCache
@@ -49,7 +49,7 @@ var genericClient = &fasthttp.Client{
 // var scriptsRegex = regexp2.MustCompile(`^<script crossorigin src="(https://a-v2\.sndcdn\.com/assets/.+\.js)"></script>$`, 2)
 // var scriptRegex = regexp2.MustCompile(`^<script crossorigin src="(https://a-v2\.sndcdn\.com/assets/0-.+\.js)"></script>$`, 2)
 
-//go:generate regexp2cg -package sc -o regexp2_codegen.go
+//go:generate go tool regexp2cg -package sc -o regexp2_codegen.go
 var clientIdRegex = regexp2.MustCompile(`client_id:"([A-Za-z0-9]{32})"`, 0) //regexp2.MustCompile(`\("client_id=([A-Za-z0-9]{32})"\)`, 0)
 var ErrVersionNotFound = errors.New("version not found")
 var ErrScriptNotFound = errors.New("script not found")
@@ -125,6 +125,10 @@ const experimental_GetClientID = true
 
 // inspired by github.com/imputnet/cobalt
 func GetClientID() (string, error) {
+	if cfg.ClientID != "" {
+		return cfg.ClientID, nil
+	}
+
 	if ClientIDCache.NextCheck.After(time.Now()) {
 		misc.Log("clientidcache hit @ 1")
 		return ClientIDCache.ClientID, nil
@@ -338,9 +342,9 @@ func Resolve(cid string, path string, out any) error {
 }
 
 type Paginated[T any] struct {
+	Next       string `json:"next_href"`
 	Collection []T    `json:"collection"`
 	Total      int64  `json:"total_results"`
-	Next       string `json:"next_href"`
 }
 
 func (p *Paginated[T]) Proceed(cid string, shouldUnfold bool) error {

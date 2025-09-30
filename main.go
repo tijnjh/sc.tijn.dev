@@ -231,7 +231,7 @@ func ServeFS(r *fiber.App, filesystem fs.FS) {
 					fp += "." + cfg.B2s(encs[0])
 				} else {
 					for _, enc := range encs {
-						if bytes.Index(ae, enc) != -1 {
+						if bytes.Contains(ae, enc) {
 							c.Response().Header.SetContentEncodingBytes(enc)
 							fp += "." + cfg.B2s(enc)
 							break
@@ -554,13 +554,13 @@ Disallow: /`)
 
 	if cfg.InstanceInfo {
 		type info struct {
+			DefaultPreferences cfg.Preferences
 			Commit             string
 			Repo               string
 			ProxyImages        bool
 			ProxyStreams       bool
 			Restream           bool
 			GetWebProfiles     bool
-			DefaultPreferences cfg.Preferences
 			EnableAPI          bool
 		}
 
@@ -1167,17 +1167,5 @@ Disallow: /`)
 		log.Println("Warning: you have CodegenConfig enabled, but the config was loaded dynamically.")
 	}
 
-	lc := fiber.ListenConfig{EnablePrefork: cfg.Prefork, DisableStartupMessage: true, ListenerNetwork: cfg.Network}
-	if cfg.Network == "unix" {
-		os.Remove(cfg.Addr)
-		lc.BeforeServeFunc = func(*fiber.App) error {
-			err := os.Chmod(cfg.Addr, cfg.UnixSocketPerms)
-			if err != nil {
-				log.Println("failed to chmod socket:", err)
-			}
-
-			return nil
-		}
-	}
-	log.Fatal(app.Listen(cfg.Addr, lc))
+	log.Fatal(app.Listen(cfg.Addr, fiber.ListenConfig{EnablePrefork: cfg.Prefork, DisableStartupMessage: true, ListenerNetwork: cfg.Network, UnixSocketFileMode: cfg.UnixSocketPerms}))
 }

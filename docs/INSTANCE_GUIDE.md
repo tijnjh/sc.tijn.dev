@@ -42,9 +42,23 @@ Soundcloak will now be up at `127.0.0.1:4664` (or the address you specified in y
 
 ## Regular method
 
-** Not recommended for deployment. **
-
 Refer to the [developer guide](DEV_GUIDE.md#setup)
+
+### Extras
+
+Not required but can help. If using docker, it already does this stuff for you.
+
+- Precompressing static files
+
+For more effective file serving: `go tool soundcloakctl -nozstd precompress`
+
+You will have to run `go tool soundcloakctl clean` and re-run the above command each time static files change.
+
+- Config codegen
+
+Can help reduce binary size (if you don't use certain features) and performance (not by much): `go tool soundcloakctl config codegen`
+
+You will have to re-run this each time you change config or config structure changes
 
 # Updating your instance
 
@@ -57,22 +71,9 @@ git fetch origin
 git pull
 ```
 
-2. Stop the container:
-
+2. Rebuild and restart the container:
 ```sh
-docker compose down
-```
-
-3. Build the container with updated source code:
-
-```sh
-docker compose build
-```
-
-4. Start the container:
-
-```sh
-docker compose up -d
+docker compose up --build -d
 ```
 
 Use `docker-compose` instead of `docker compose` if that fails.
@@ -115,7 +116,8 @@ Some notes:
 | TrackCacheCleanDelay    | TRACK_CACHE_CLEAN_DELAY    | 5 minutes                                                                                                                                                                                                                                                | Time between each cleanup of the cache (to remove expired tracks)                                                                                                                                                                                                                                                                                                   |
 | PlaylistTTL             | PLAYLIST_TTL               | 20 minutes                                                                                                                                                                                                                                               | Time until Playlist data cache expires                                                                                                                                                                                                                                                                                                                              |
 | PlaylistCacheCleanDelay | PLAYLIST_CACHE_CLEAN_DELAY | 5 minutes                                                                                                                                                                                                                                                | Time between each cleanup of the cache (to remove expired playlists)                                                                                                                                                                                                                                                                                                |
-| UserAgent               | USER_AGENT                 | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.3                                                                                                                                           | User-Agent header used for requests to SoundCloud                                                                                                                                                                                                                                                                                                                   |
+| UserAgent               | USER_AGENT                 | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36                                                                                                                                           | User-Agent header used for requests to SoundCloud                                                                                                                                                                                                                                                                                                                   |
+| ClientID               | CLIENT_ID                | (empty)                                                                                                                                           | Authorization token for requests to SoundCloud. It's automatically extracted from the current version of the website, but you can override it if there are issues                                                                                                                                                                                                                                                                                                                 |
 | DNSCacheTTL             | DNS_CACHE_TTL              | 60 minutes                                                                                                                                                                                                                                               | Time until DNS cache expires                                                                                                                                                                                                                                                                                                                                        |
 | EnableAPI               | ENABLE_API                 | false                                                                                                                                                                                                                                               | Should [API](API.md) be enabled?                                                                                                                                                                                                                                                                                                                                        |
 | Network                 | NETWORK                    | tcp4                                                                                                                                                                                                                                                     | Network to listen on. Can be tcp4, tcp6 or unix                                                                                                                                                                                                                                                                                                                     |
@@ -124,10 +126,24 @@ Some notes:
 | Prefork                 | PREFORK                    | false                                                                                                                                                                                                                                                    | Run multiple instances of soundcloak locally to be able to handle more requests. Each one will be a separate process, so they will have separate cache.                                                                                                                                                                                                             |
 | TrustedProxyCheck       | TRUSTED_PROXY_CHECK        | true                                                                                                                                                                                                                                                     | Use X-Forwarded-* headers if IP is in TrustedProxies list. When disabled, those headers will blindly be used.                                                                                                                                                                                                                                                       |
 | TrustedProxies          | TRUSTED_PROXIES            | []                                                                                                                                                                                                                                                       | List of IPs or IP ranges of trusted proxies                                                                                                                                                                                                                                                                                                                         |
-| CodegenConfig           | CODEGEN_CONFIG             | false                                                                                                                                                                                                                                                    | Highly recommended to enable. Embeds the config into the binary, which helps reduce size if you aren't using certain features and generally optimize the binary better. Keep in mind that you will have to rebuild the image/binary each time you want to change config. (Note: you need to run `soundcloakctl config codegen` or use docker, as it runs it for you) |
-| EmbedFiles              | EMBED_FILES                | false                                                                                                                                                                                                                                                    | Embed files into the binary. Keep in mind that you will have to rebuild the image/binary each time  static files are changed (e.g. custom instance files)                                                                                                                                                                                                           |
+| CodegenConfig           | CODEGEN_CONFIG             | false                                                                                                                                                                                                                                                    | Embeds the config into the binary, which helps reduce size if you aren't using certain features and generally optimize the binary better. Keep in mind that you will have to rebuild the image/binary each time you want to change config. (Note: you need to run `soundcloakctl config codegen` or use docker, as it runs it for you) |
+| EmbedFiles              | EMBED_FILES                | true                                                                                                                                                                                                                                                   | Embed files into the binary. Keep in mind that you will have to rebuild the image/binary each time  static files are changed (e.g. custom instance files)                                                                                                                                                                                                           |
 
 </details>
+
+## Potential issues
+
+### Status code 403/429
+Your IP address did too many requests to SoundCloud and got blocked for a bit of time.
+
+### script/version/clientid not found
+soundcloak failed to extract the ClientID token from SoundCloud. 
+This may happen due to your due to changes made by SoundCloud, or IP getting blocked.
+
+In case your IP is not blocked, please report this issue to me on [Codeberg](https://codeberg.org/maid-zone/soundcloak/issues/new) or [GitHub](https://github.com/maid-zone/soundcloak/issues/new) or elsewhere
+
+As a temporary fix, you can go to SoundCloud website in your browser, open the Developer Tools, perform some actions (like loading a profile or searching) and check the Network tab.
+There you will see requests to `api-v2.soundcloud.com` with `client_id` parameter. You can use this token with the `ClientID` setting in soundcloak
 
 ## Tinkering with the frontend
 
@@ -135,6 +151,9 @@ Some notes:
 <summary>Click to view</summary>
 
 I will mainly talk about the static files here. Maybe about the templates too in the future
+
+Keep in mind that by default soundcloak will embed all static files into the built binary. You will need to rebuild each time you want to change something. 
+Or you can also set `EmbedFiles` to `false`
 
 The static files are stored in `static/assets` folder
 
