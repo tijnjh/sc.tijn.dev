@@ -18,7 +18,7 @@ cd soundcloak
 
 3. Download required JS modules:
 
-Currently it's just HLS.js
+Currently it's just HLS.js. This is what powers the HLS player
 
 ```sh
 go tool soundcloakctl js download
