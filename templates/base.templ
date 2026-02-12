@@ -16,7 +16,7 @@ templ Base(title string, content templ.Component, head templ.Component) {
 				if title != "" {
 					{ title } ~
 				}
-				sc.tijn.dev
+				soundcloak.tijn.dev
 			</title>
 			if head != nil {
 				@head
@@ -28,7 +28,7 @@ templ Base(title string, content templ.Component, head templ.Component) {
 			}
 		 	<div style="display: flex; align-items: center; justify-content: center; gap: 1rem;">
 				<img src="/_/static/cat_with_boombox.jpg" alt="cat with boombox" width="50" />
-				<a href="/" id="sc"><h1>sc.tijn.dev</h1></a>
+				<a href="/" id="sc"><h1>soundcloak.tijn.dev</h1></a>
 			</div>
 			@content
 		</body>
