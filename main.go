@@ -289,7 +289,11 @@ func main() {
 
 	app.Use(compress.New(compress.Config{
 		Next: func(c fiber.Ctx) bool {
-			return strings.HasPrefix(c.Path(), "/_/static")
+			p := c.RequestCtx().Path()
+			const x = "/_/proxy"
+			const y = "/_/restream"
+			return len(p) > len(y) && (string(p[:len(x)]) == x || string(p[:len(y)]) == y)
+			//return strings.HasPrefix(c.Path(), "/_/static")
 		},
 		Level: compress.LevelBestSpeed,
 	}))
@@ -692,7 +696,6 @@ Disallow: /`)
 				cfg.AudioOpus: true,
 				cfg.AudioMP3:  true,
 			}
-			fmt.Println(t.Media.Transcodings)
 			for _, tr := range t.Media.Transcodings {
 				switch tr.Format.Protocol {
 				case sc.ProtocolHLS:
