@@ -1,6 +1,7 @@
 package cfg
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -26,7 +27,6 @@ var DefaultPreferences Preferences
 
 // proxy images (user avatars, track/playlist covers)
 var ProxyImages = false
-var ImageCacheControl = "max-age=600, public, immutable" // browser-side 10 minutes cache by default, only used for proxied images
 
 // proxy streams (hls playlist files and track parts)
 var ProxyStreams = false
@@ -35,7 +35,7 @@ var ProxyStreams = false
 // If this setting is set to true, ProxyStreams and FullyPreloadTrack will be ignored (you could count this as a replacement for having both as true, also should be a bit more effective)
 // You can also easily download the songs this way (right click => save audio as..., the only downside is that there is no metadata)
 var Restream = false
-var RestreamCacheControl = "max-age=3600, public, immutable"
+var RestreamCacheControl = "max-age=252460800"
 
 // enable /_/info endpoint (shows if some settings are enabled/disabled)
 var InstanceInfo = true
@@ -158,6 +158,7 @@ func defaultPreferences() {
 	DefaultPreferences.SearchSuggestions = &False
 	DefaultPreferences.DynamicLoadComments = &False
 	DefaultPreferences.KeepPlayerFocus = &False
+	DefaultPreferences.Waveform = &False
 }
 
 func loadDefaultPreferences(loaded Preferences) {
@@ -216,23 +217,46 @@ func loadDefaultPreferences(loaded Preferences) {
 		DefaultPreferences.DefaultAutoplayMode = &p
 	}
 
-	p := AudioMP3
 	if loaded.HLSAudio != nil {
-		DefaultPreferences.HLSAudio = loaded.HLSAudio
+		switch *loaded.HLSAudio {
+		case AudioBest:
+			fmt.Println(`"best" audio preset has been deprecated, please change it in your config. Interpreting it as "aac"`)
+			DefaultPreferences.HLSAudio = &AAC
+		default:
+			DefaultPreferences.HLSAudio = loaded.HLSAudio
+		}
 	} else {
-		DefaultPreferences.HLSAudio = &p
+		DefaultPreferences.HLSAudio = &MP3
 	}
 
 	if loaded.RestreamAudio != nil {
-		DefaultPreferences.RestreamAudio = loaded.RestreamAudio
+		switch *loaded.RestreamAudio {
+		case AudioBest:
+			fmt.Println(`"best" audio preset has been deprecated, please change it in your config. Interpreting it as "aac"`)
+			DefaultPreferences.RestreamAudio = &AAC
+		case AudioOpus:
+			fmt.Println(`"opus" audio preset has been deprecated, please change it in your config. Interpreting it as "mpeg"`)
+			DefaultPreferences.RestreamAudio = &MP3
+		default:
+			DefaultPreferences.RestreamAudio = loaded.RestreamAudio
+		}
 	} else {
-		DefaultPreferences.RestreamAudio = &p
+		DefaultPreferences.RestreamAudio = &MP3
 	}
 
 	if loaded.DownloadAudio != nil {
-		DefaultPreferences.DownloadAudio = loaded.DownloadAudio
+		switch *loaded.DownloadAudio {
+		case AudioBest:
+			fmt.Println(`"best" audio preset has been deprecated, please change it in your config. Interpreting it as "aac"`)
+			DefaultPreferences.DownloadAudio = &AAC
+		case AudioOpus:
+			fmt.Println(`"opus" audio preset has been deprecated, please change it in your config. Interpreting it as "mpeg"`)
+			DefaultPreferences.DownloadAudio = &MP3
+		default:
+			DefaultPreferences.DownloadAudio = loaded.RestreamAudio
+		}
 	} else {
-		DefaultPreferences.DownloadAudio = &p
+		DefaultPreferences.DownloadAudio = &MP3
 	}
 
 	if loaded.ShowAudio != nil {
@@ -257,6 +281,12 @@ func loadDefaultPreferences(loaded Preferences) {
 		DefaultPreferences.KeepPlayerFocus = loaded.KeepPlayerFocus
 	} else {
 		DefaultPreferences.KeepPlayerFocus = &False
+	}
+
+	if loaded.Waveform != nil {
+		DefaultPreferences.Waveform = loaded.Waveform
+	} else {
+		DefaultPreferences.Waveform = &False
 	}
 }
 
@@ -286,11 +316,6 @@ func fromEnv() error {
 	env = os.Getenv("PROXY_IMAGES")
 	if env != "" {
 		ProxyImages = boolean(env)
-	}
-
-	env = os.Getenv("IMAGE_CACHE_CONTROL")
-	if env != "" {
-		ImageCacheControl = env
 	}
 
 	env = os.Getenv("PROXY_STREAMS")
@@ -492,7 +517,6 @@ func init() {
 		GetWebProfiles          *bool
 		DefaultPreferences      *Preferences
 		ProxyImages             *bool
-		ImageCacheControl       *string
 		ProxyStreams            *bool
 		Restream                *bool
 		RestreamCacheControl    *string
@@ -535,9 +559,6 @@ func init() {
 	}
 	if config.ProxyImages != nil {
 		ProxyImages = *config.ProxyImages
-	}
-	if config.ImageCacheControl != nil {
-		ImageCacheControl = *config.ImageCacheControl
 	}
 	if config.ProxyStreams != nil {
 		ProxyStreams = *config.ProxyStreams

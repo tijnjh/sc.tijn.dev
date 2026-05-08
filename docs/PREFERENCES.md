@@ -2,13 +2,13 @@
 
 | Name                             | Key                 | Default                                                                | Possible values               | Description                                                                                                                                                                                                              |
 | :--------------------------------- | --------------------- | ------------------------------------------------------------------------ | ------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Download audio                       | DownloadAudio              | "mpeg"                                                                 | "mpeg", "opus", "aac", "best" | What [audio preset](AUDIO_PRESETS.md) should be loaded when downloading audio with metadata. Restream must be enabled on the backend                                                                                      |
+| Download audio                       | DownloadAudio              | "mpeg"                                                                 | "mpeg", "aac" | What [audio preset](AUDIO_PRESETS.md) should be loaded when downloading audio with metadata. Restream must be enabled on the backend                                                                                      |
 
 # Player preferences
 
 | Name                             | Key                 | Default                                                                | Possible values               | Description                                                                                                                                                                                                              |
 | :--------------------------------- | --------------------- | ------------------------------------------------------------------------ | ------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Player                               | Player                     | "restream" if Restream is enabled in backend config, otherwise - "hls" | "restream", "hls", "none"     | Method used to play the track in the frontend. HLS - requires JavaScript, loads the track in pieces. Restream - works without JavaScript, loads entire track through the backend right away. None - don't play the track |
+| Player                               | Player                     | "restream" if Restream is enabled in backend config, otherwise - "hls" | "restream", "hls", "progressive", "none"     | Method used to play the track in the frontend. HLS - requires JavaScript, loads the track in pieces. Restream/Progressive - works without JavaScript, loads entire track through the backend right away. None - don't play the track |
 
 ## HLS Player
 
@@ -23,7 +23,7 @@
 
 | Name            | Key           | Default | Possible values               | Description                                                                |
 | :---------------- | --------------- | --------- | ------------------------------- | :--------------------------------------------------------------------------- |
-| Streaming audio | RestreamAudio | "mpeg"  | "mpeg", "opus", "aac", "best" | What [audio preset](AUDIO_PRESETS.md) should be loaded when streaming audio |
+| Streaming audio | RestreamAudio | "mpeg"  | "mpeg", "aac" | What [audio preset](AUDIO_PRESETS.md) should be loaded when streaming audio |
 
 
 # Frontend enhancements
@@ -36,6 +36,7 @@
 | Fetch search suggestions             | SearchSuggestions          | false                                                                  | true, false                   | Load search suggestions on main page when you type. Requires JS                                                                                                                                                          |
 | Dynamically load comments            | DynamicLoadComments        | false                                                                  | true, false                   | Dynamically load track comments, without leaving the page. Requires JS    
 | Keep player focus                    | KeepPlayerFocus            | false                                                                  | true, false                   | Always keep track element in focus, so you can control it with keyboard. Requires JS                                                                                                                                                   |
+| Show track waveform                  | Waveform                   | false                                                                  | true, false                   | Shows track waveform. If you have enabled JS, it will also be filled according to how much of the track played, and you can control playback with it                                                                                                                                                   |
 
 ## Autoplay
 *Requires JS. You also need to allow autoplay from this domain*

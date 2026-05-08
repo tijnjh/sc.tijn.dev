@@ -16,6 +16,7 @@ import (
 
 const on = "on"
 
+// apply defaults + migration code
 func Defaults(dst *cfg.Preferences) {
 	if dst.Player == nil {
 		dst.Player = cfg.DefaultPreferences.Player
@@ -49,16 +50,40 @@ func Defaults(dst *cfg.Preferences) {
 		dst.DefaultAutoplayMode = cfg.DefaultPreferences.DefaultAutoplayMode
 	}
 
+	// THE GREAT OPUS MIGRATION
 	if dst.HLSAudio == nil {
 		dst.HLSAudio = cfg.DefaultPreferences.HLSAudio
+	} else {
+		switch *dst.HLSAudio {
+		case cfg.AudioOpus:
+			dst.HLSAudio = &cfg.MP3
+		case cfg.AudioBest:
+			dst.HLSAudio = &cfg.AAC
+		}
 	}
 
+	// they removed ogg/opus encodings from every single track, there is nothing anywhere
 	if dst.RestreamAudio == nil {
 		dst.RestreamAudio = cfg.DefaultPreferences.RestreamAudio
+	} else {
+		switch *dst.RestreamAudio {
+		case cfg.AudioOpus:
+			dst.RestreamAudio = &cfg.MP3
+		case cfg.AudioBest:
+			dst.RestreamAudio = &cfg.AAC
+		}
 	}
 
+	// only remains mp3 and aac
 	if dst.DownloadAudio == nil {
 		dst.DownloadAudio = cfg.DefaultPreferences.DownloadAudio
+	} else {
+		switch *dst.DownloadAudio {
+		case cfg.AudioOpus:
+			dst.DownloadAudio = &cfg.MP3
+		case cfg.AudioBest:
+			dst.DownloadAudio = &cfg.AAC
+		}
 	}
 
 	if dst.ShowAudio == nil {
@@ -75,6 +100,10 @@ func Defaults(dst *cfg.Preferences) {
 
 	if dst.KeepPlayerFocus == nil {
 		dst.KeepPlayerFocus = cfg.DefaultPreferences.KeepPlayerFocus
+	}
+
+	if dst.Waveform == nil {
+		dst.Waveform = cfg.DefaultPreferences.Waveform
 	}
 }
 
@@ -107,6 +136,7 @@ type PrefsForm struct {
 	SearchSuggestions        string
 	DynamicLoadComments      string
 	KeepPlayerFocus          string
+	Waveform                 string
 }
 
 type Export struct {
@@ -240,6 +270,12 @@ func Load(r *fiber.App) {
 			old.KeepPlayerFocus = &cfg.False
 		}
 
+		if p.Waveform == on {
+			old.Waveform = &cfg.True
+		} else {
+			old.Waveform = &cfg.False
+		}
+
 		old.Player = &p.Player
 
 		setPrefs(c, &old)
@@ -255,7 +291,7 @@ func Load(r *fiber.App) {
 		cookie.SetValue("{}")
 		cookie.SetExpire(time.Now().Add(400 * 24 * time.Hour))
 		cookie.SetHTTPOnly(true)
-		cookie.SetSameSite(fasthttp.CookieSameSiteStrictMode)
+		cookie.SetSameSite(fasthttp.CookieSameSiteLaxMode)
 		cookie.SetPath("/")
 		c.Response().Header.SetCookie(cookie)
 		fasthttp.ReleaseCookie(cookie)

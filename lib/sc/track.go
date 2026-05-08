@@ -1,8 +1,10 @@
 package sc
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"strconv"
 	"strings"
@@ -11,6 +13,8 @@ import (
 
 	"git.maid.zone/stuff/soundcloak/lib/cfg"
 	"git.maid.zone/stuff/soundcloak/lib/misc"
+	"github.com/a-h/templ"
+	templruntime "github.com/a-h/templ/runtime"
 	"github.com/goccy/go-json"
 	"github.com/valyala/fasthttp"
 )
@@ -24,27 +28,33 @@ var TracksCache = map[string]cached[Track]{}
 var tracksCacheLock = &sync.RWMutex{}
 
 type Track struct {
-	Artwork       string      `json:"artwork_url"`
-	CreatedAt     string      `json:"created_at"`
-	Description   string      `json:"description"`
-	Genre         string      `json:"genre"`
-	Kind          string      `json:"kind"` // should always be "track"!
-	LastModified  string      `json:"last_modified"`
-	License       string      `json:"license"`
-	Permalink     string      `json:"permalink"`
-	TagList       string      `json:"tag_list"`
-	Title         string      `json:"title"`
-	ID            json.Number `json:"id"`
-	Authorization string      `json:"track_authorization"`
-	Policy        TrackPolicy `json:"policy"`
-	Station       string      `json:"station_permalink"`
-	Media         Media       `json:"media"`
-	Author        User        `json:"user"`
-	Comments      int         `json:"comment_count"`
-	Likes         int64       `json:"likes_count"`
-	Played        int64       `json:"playback_count"`
-	Reposted      int64       `json:"reposts_count"`
-	Duration      uint32      `json:"full_duration"`
+	Artwork           string            `json:"artwork_url"`
+	CreatedAt         string            `json:"created_at"`
+	Description       string            `json:"description"`
+	Genre             string            `json:"genre"`
+	Kind              string            `json:"kind"` // should always be "track"!
+	LastModified      string            `json:"last_modified"`
+	License           string            `json:"license"`
+	Permalink         string            `json:"permalink"`
+	TagList           string            `json:"tag_list"`
+	Title             string            `json:"title"`
+	ID                json.Number       `json:"id"`
+	Authorization     string            `json:"track_authorization"`
+	Policy            TrackPolicy       `json:"policy"`
+	Station           string            `json:"station_permalink"`
+	Media             Media             `json:"media"`
+	Author            User              `json:"user"`
+	Comments          int               `json:"comment_count"`
+	Likes             int64             `json:"likes_count"`
+	Played            int64             `json:"playback_count"`
+	Reposted          int64             `json:"reposts_count"`
+	Duration          uint32            `json:"full_duration"`
+	Waveform          string            `json:"waveform_url"`
+	PublisherMetadata PublisherMetadata `json:"publisher_metadata"`
+}
+
+type PublisherMetadata struct {
+	ISRC string `json:"isrc"`
 }
 
 type TrackPolicy string
@@ -78,6 +88,14 @@ type Transcoding struct {
 	Quality string `json:"quality"`
 }
 
+func (t Transcoding) Slug(tr Track) string {
+	return tr.Author.Permalink + "/" +
+		tr.Permalink + "/" +
+		t.Quality + "/" +
+		t.Preset + "/" +
+		string(t.Format.Protocol)
+}
+
 type Media struct {
 	Transcodings []Transcoding `json:"transcodings"`
 }
@@ -93,43 +111,96 @@ type Comment struct {
 	Timestamp int    `json:"timestamp"`
 }
 
-func (m Media) SelectCompatible(mode string, opus bool, restream bool) (*Transcoding, string) {
-	switch mode {
-	case cfg.AudioBest:
-		for _, t := range m.Transcodings {
-			if t.Format.Protocol == ProtocolHLS && t.Preset == "aac_160k" {
-				return &t, cfg.AudioAAC
-			}
-		}
+// func (m Media) SelectCompatible(mode string, restream bool) (*Transcoding, string) {
+// 	switch mode {
+// 	case cfg.AudioBest:
+// 	case cfg.AudioAAC:
+// 		for _, t := range m.Transcodings {
+// 			if t.Format.Protocol == ProtocolHLS && t.Preset == "aac_160k" {
+// 				return &t, cfg.AudioAAC
+// 			}
+// 		}
+// 	}
 
-		if opus {
-			for _, t := range m.Transcodings {
-				if t.Format.Protocol == ProtocolHLS && strings.HasPrefix(t.Preset, "opus_") {
-					return &t, cfg.AudioOpus
+// 	if restream {
+// 		for _, t := range m.Transcodings {
+// 			if t.Format.Protocol == ProtocolProgressive && t.Format.MimeType == "audio/mpeg" {
+// 				return &t, cfg.AudioMP3
+// 			}
+// 		}
+// 	}
+// 	for _, t := range m.Transcodings {
+// 		if t.Format.Protocol == ProtocolHLS && t.Format.MimeType == "audio/mpeg" {
+// 			return &t, cfg.AudioMP3
+// 		}
+// 	}
+// 	return nil, ""
+// }
+
+func (m Media) SelectCompatibleRestream(mode string) (*Transcoding, string) {
+	var b1 *Transcoding
+	// note that best is deprecated, left for compatibility
+	if mode == cfg.AudioAAC || mode == cfg.AudioBest {
+		// reduce iterations count :)
+		var b2 *Transcoding
+		for _, t := range m.Transcodings {
+			switch t.Format.Protocol {
+			case ProtocolHLS:
+				if t.Preset == "aac_160k" {
+					return &t, cfg.AudioAAC
+				} else if b1 == nil && t.Format.MimeType == "audio/mpeg" {
+					b1 = &t
+				}
+			case ProtocolProgressive:
+				if b2 == nil && t.Format.MimeType == "audio/mpeg" {
+					b2 = &t
 				}
 			}
 		}
-	case cfg.AudioAAC:
-		for _, t := range m.Transcodings {
-			if t.Format.Protocol == ProtocolHLS && t.Preset == "aac_160k" {
-				return &t, cfg.AudioAAC
-			}
+		// progressive prefered instead of hls because less processing
+		if b2 != nil {
+			return b2, cfg.AudioMP3
 		}
-	case cfg.AudioOpus:
-		for _, t := range m.Transcodings {
-			if t.Format.Protocol == ProtocolHLS && strings.HasPrefix(t.Preset, "opus_") {
-				return &t, cfg.AudioOpus
-			}
+		if b1 != nil {
+			return b1, cfg.AudioMP3
 		}
+		return nil, ""
 	}
 
-	if restream {
-		for _, t := range m.Transcodings {
-			if t.Format.Protocol == ProtocolProgressive && t.Format.MimeType == "audio/mpeg" {
+	for _, t := range m.Transcodings {
+		if t.Format.MimeType == "audio/mpeg" {
+			switch t.Format.Protocol {
+			case ProtocolProgressive:
 				return &t, cfg.AudioMP3
+			case ProtocolHLS:
+				b1 = &t
 			}
 		}
 	}
+	if b1 != nil {
+		return b1, cfg.AudioMP3
+	}
+	return nil, ""
+}
+
+func (m Media) SelectCompatibleHLS(mode string) (*Transcoding, string) {
+	if mode == cfg.AudioAAC || mode == cfg.AudioBest {
+		var b1 *Transcoding
+		for _, t := range m.Transcodings {
+			if t.Format.Protocol == ProtocolHLS {
+				if t.Preset == "aac_160k" {
+					return &t, cfg.AudioAAC
+				} else if b1 == nil && t.Format.MimeType == "audio/mpeg" {
+					b1 = &t
+				}
+			}
+		}
+		if b1 != nil {
+			return b1, cfg.AudioMP3
+		}
+		return nil, ""
+	}
+
 	for _, t := range m.Transcodings {
 		if t.Format.Protocol == ProtocolHLS && t.Format.MimeType == "audio/mpeg" {
 			return &t, cfg.AudioMP3
@@ -313,13 +384,34 @@ func GetTracks(ids string) ([]Track, error) {
 	return res, err
 }
 
-func (tr Transcoding) GetStream(prefs cfg.Preferences, authorization string) (string, error) {
+type CachedStream struct {
+	Playlist  *fasthttp.URI
+	Base      *fasthttp.URI
+	FreshBase bool
+}
+
+var StreamCache = map[string]cached[CachedStream]{}
+var StreamCacheMut = sync.RWMutex{}
+
+func (tr Transcoding) GetStream(slug string, t Track) (cached[CachedStream], error) {
+	if slug == "" {
+		slug = tr.Slug(t)
+	}
+
+	StreamCacheMut.RLock()
+	s, ok := StreamCache[slug]
+	StreamCacheMut.RUnlock()
+	if ok && s.Expires.After(time.Now()) {
+		misc.Log("cache hit", s)
+		return s, nil
+	}
+
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
 
 	req.SetRequestURI(tr.URL)
 	req.URI().QueryArgs().Set("client_id", ClientID)
-	req.URI().QueryArgs().Set("track_authorization", authorization)
+	req.URI().QueryArgs().Set("track_authorization", t.Authorization)
 	req.Header.SetUserAgent(cfg.UserAgent)
 	req.Header.Set("Accept-Encoding", "gzip, deflate, br, zstd")
 
@@ -328,11 +420,11 @@ func (tr Transcoding) GetStream(prefs cfg.Preferences, authorization string) (st
 
 	err := DoWithRetry(httpc, req, resp)
 	if err != nil {
-		return "", err
+		return s, err
 	}
 
 	if resp.StatusCode() != 200 {
-		return "", fmt.Errorf("getstream: got status code %d", resp.StatusCode())
+		return s, fmt.Errorf("getstream: got status code %d", resp.StatusCode())
 	}
 
 	data, err := resp.BodyUncompressed()
@@ -340,32 +432,30 @@ func (tr Transcoding) GetStream(prefs cfg.Preferences, authorization string) (st
 		data = resp.Body()
 	}
 
-	var s Stream
-	err = json.Unmarshal(data, &s)
+	var st Stream
+	err = json.Unmarshal(data, &st)
 	if err != nil {
-		return "", err
+		return s, err
 	}
 
-	misc.Log(s)
+	misc.Log(st)
 
-	if s.URL == "" {
-		return "", ErrNoURL
+	if st.URL == "" {
+		return s, ErrNoURL
 	}
 
-	if cfg.ProxyStreams && *prefs.ProxyStreams {
-		switch *prefs.Player {
-		case cfg.HLSPlayer:
-			if tr.Preset == "aac_160k" {
-				return "/_/proxy/streams/playlist/aac?url=" + url.QueryEscape(s.URL), nil
-			}
-
-			return "/_/proxy/streams/playlist?url=" + url.QueryEscape(s.URL), nil
-		case cfg.ProgressivePlayer:
-			return "/_/proxy/streams?url=" + url.QueryEscape(s.URL), nil
-		}
+	if s.Value.Playlist == nil {
+		s.Value.Playlist = fasthttp.AcquireURI()
 	}
-
-	return s.URL, nil
+	err = s.Value.Playlist.Parse(nil, cfg.S2b(st.URL))
+	if err == nil {
+		s.Expires = time.Now().Add(time.Duration(t.Duration)*time.Millisecond + 105*time.Second)
+		s.Value.FreshBase = true
+		StreamCacheMut.Lock()
+		StreamCache[slug] = s
+		StreamCacheMut.Unlock()
+	}
+	return s, err
 }
 
 func (t *Track) Fix(large bool, fixAuthor bool) {
@@ -403,7 +493,7 @@ func (t Track) FormatDescription() string {
 	desc += "\nCreated: " + t.CreatedAt
 	desc += "\nLast modified: " + t.LastModified
 	if len(t.TagList) != 0 {
-		desc += "\nTags: " + strings.Join(TagListParser(t.TagList), ", ")
+		desc += "\nTags: " + TagListParser(t.TagList)
 	}
 
 	return desc
@@ -557,11 +647,92 @@ func ToExt(audio string) string {
 	switch audio {
 	case cfg.AudioAAC:
 		return "m4a"
-	case cfg.AudioOpus:
-		return "ogg"
 	case cfg.AudioMP3:
 		return "mp3"
 	}
 
 	return ""
+}
+
+type Waveform struct {
+	//Width   int   `json:"width"`
+	Height  uint64   `json:"height"`
+	Samples []uint64 `json:"samples"`
+}
+
+func (t *Track) RenderWaveform() templ.Component {
+	if t.Waveform == "" {
+		return templ.NopComponent
+	}
+
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+
+	req.SetRequestURI(t.Waveform)
+	req.Header.SetUserAgent(cfg.UserAgent)
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br, zstd")
+
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(resp)
+
+	err := DoWithRetry(httpc, req, resp)
+	if err != nil {
+		return templ.NopComponent
+	}
+
+	data, err := resp.BodyUncompressed()
+	if err != nil {
+		data = resp.Body()
+	}
+
+	var wf Waveform
+	err = json.Unmarshal(data, &wf)
+	if err != nil || len(wf.Samples) == 0 || wf.Height == 0 {
+		return templ.NopComponent
+	}
+
+	return templ.ComponentFunc(func(_ context.Context, w io.Writer) error {
+		ww := w.(*templruntime.Buffer)
+		_, err := ww.WriteString(`<svg class="waveform" viewBox="0 0 200 100" preserveAspectRatio="none"><defs><clipPath id="wf-p"><rect x="0" y="0" width="0" height="100"/></clipPath></defs><path d="`)
+		if err != nil {
+			return err
+		}
+		const (
+			targetBars = 200
+			svgHeight  = 100
+			center     = svgHeight / 2
+		)
+
+		step := len(wf.Samples) / targetBars
+		if step < 1 {
+			step = 1
+		}
+
+		var count uint64
+		b := make([]byte, 1, 10)
+		b[0] = 'M'
+		for i := 0; i < len(wf.Samples) && count < targetBars; i += step {
+			h := wf.Samples[i] * center / wf.Height
+			if h < 1 {
+				h = 1
+			}
+
+			b = b[:1]
+			b = strconv.AppendUint(b, count, 10)
+			b = append(b, ',')
+			b = strconv.AppendUint(b, center-h, 10)
+			b = append(b, 'V')
+			b = strconv.AppendUint(b, center+h, 10)
+			count++
+			_, err = ww.Write(b)
+			if err != nil {
+				return err
+			}
+		}
+		_, err = ww.WriteString(`" stroke="var(--0)" fill="none" stroke-width="0.6"/></svg><script async src="/_/static/waveform.js"></script>`)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 }

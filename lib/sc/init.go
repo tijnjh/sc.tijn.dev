@@ -15,7 +15,7 @@ import (
 
 	"git.maid.zone/stuff/soundcloak/lib/cfg"
 	"git.maid.zone/stuff/soundcloak/lib/misc"
-	"github.com/dlclark/regexp2"
+	"github.com/dlclark/regexp2/v2"
 	"github.com/goccy/go-json"
 	utls "github.com/refraction-networking/utls"
 	"github.com/refraction-networking/utls/dicttls"
@@ -66,12 +66,12 @@ var httpc = &fasthttp.HostClient{
 	IsTLS:               true,
 	MaxIdleConnDuration: cfg.MaxIdleConnDuration,
 	DialDualStack:       cfg.DialDualStack,
-	//TLSConfig:           tlsConfig,
 }
+
+var Httpc = httpc // :P
 
 var genericClient = &fasthttp.Client{
 	DialDualStack: cfg.DialDualStack,
-	//TLSConfig:     tlsConfig,
 }
 
 // var verRegex = regexp2.MustCompile(`^<script>window\.__sc_version="([0-9]{10})"</script>$`, 2)
@@ -79,8 +79,8 @@ var genericClient = &fasthttp.Client{
 // var scriptRegex = regexp2.MustCompile(`^<script crossorigin src="(https://a-v2\.sndcdn\.com/assets/0-.+\.js)"></script>$`, 2)
 
 //go:generate go tool regexp2cg -package sc -o regexp2_codegen.go
-var clientIdRegex = regexp2.MustCompile(`client_id:"([A-Za-z0-9]{32})"`, 0) //regexp2.MustCompile(`\("client_id=([A-Za-z0-9]{32})"\)`, 0)
-var hydrationClientIdRegex = regexp2.MustCompile(`{"hydratable":"apiClient","data":{"id":"([A-Za-z0-9]{32})"`, 0)
+var clientIdRegex = regexp2.MustCompile(`client_id:"([A-Za-z0-9]{32})"`, regexp2.None) //regexp2.MustCompile(`\("client_id=([A-Za-z0-9]{32})"\)`, 0)
+var hydrationClientIdRegex = regexp2.MustCompile(`{"hydratable":"apiClient","data":{"id":"([A-Za-z0-9]{32})"`, regexp2.None)
 var ErrVersionNotFound = errors.New("version not found")
 var ErrScriptNotFound = errors.New("script not found")
 var ErrIDNotFound = errors.New("clientid not found")
@@ -396,34 +396,25 @@ func (p *Paginated[T]) Proceed(shouldUnfold bool) error {
 	return nil
 }
 
-func TagListParser(taglist string) (res []string) {
+func TagListParser(taglist string) string {
+	sb := strings.Builder{}
+	sb.Grow(len(taglist) * 5 / 3)
 	inString := false
-	cur := []byte{}
-	for i, c := range cfg.S2b(taglist) {
+	for _, c := range cfg.S2b(taglist) {
 		if c == '"' {
-			if i == len(taglist)-1 {
-				res = append(res, string(cur))
-				return
-			}
-
 			inString = !inString
 			continue
 		}
 
 		if !inString && c == ' ' {
-			res = append(res, string(cur))
-			cur = cur[:0]
+			sb.WriteString(", ")
 			continue
 		}
 
-		cur = append(cur, c)
+		sb.WriteByte(c)
 	}
 
-	if len(cur) != 0 {
-		res = append(res, string(cur))
-	}
-
-	return
+	return sb.String()
 }
 
 type SearchSuggestion struct {
@@ -557,7 +548,24 @@ func utls_dial(addr string) (net.Conn, error) {
 		ClientSessionCache:                 tls_cache,
 		PreferSkipResumptionOnNilExtension: false,
 	}, utls.HelloCustom)
-	spec := &utls.ClientHelloSpec{
+	var alpn_ext *utls.ALPNExtension
+	if host == "api-v2.soundcloud.com" {
+		// api-v2 has no h2, and fasthttp have no h2, so we can safely spoof h2 :P
+		// maybe in the future I will have to rewrite to golang's http for using h2
+		alpn_ext = &utls.ALPNExtension{
+			AlpnProtocols: []string{
+				"h2",
+				"http/1.1",
+			},
+		}
+	} else {
+		alpn_ext = &utls.ALPNExtension{
+			AlpnProtocols: []string{
+				"http/1.1",
+			},
+		}
+	}
+	uconn.ApplyPreset(&utls.ClientHelloSpec{
 		TLSVersMin: utls.VersionTLS12,
 		TLSVersMax: utls.VersionTLS13,
 		CipherSuites: []uint16{
@@ -604,103 +612,81 @@ func utls_dial(addr string) (net.Conn, error) {
 					0x0, // uncompressed
 				},
 			},
-			//&utls.SessionTicketExtension{},
-		},
-	}
-	if _, ok := tls_cache.Get(host); !ok {
-		spec.Extensions = append(spec.Extensions, &utls.SessionTicketExtension{})
-	}
-	var alpn_ext *utls.ALPNExtension
-	if host == "api-v2.soundcloud.com" {
-		// api-v2 has no h2, and fasthttp have no h2, so we can safely spoof h2 :P
-		// maybe in the future I will have to rewrite to golang's http for using h2
-		alpn_ext = &utls.ALPNExtension{
-			AlpnProtocols: []string{
-				"h2",
-				"http/1.1",
+			&utls.SessionTicketExtension{},
+			alpn_ext,
+			&utls.StatusRequestExtension{},
+			&utls.FakeDelegatedCredentialsExtension{
+				SupportedSignatureAlgorithms: []utls.SignatureScheme{
+					utls.ECDSAWithP256AndSHA256,
+					utls.ECDSAWithP384AndSHA384,
+					utls.ECDSAWithP521AndSHA512,
+					utls.ECDSAWithSHA1,
+				},
 			},
-		}
-	} else {
-		alpn_ext = &utls.ALPNExtension{
-			AlpnProtocols: []string{
-				"http/1.1",
-			},
-		}
-	}
-	spec.Extensions = append(spec.Extensions,
-		alpn_ext,
-		&utls.StatusRequestExtension{},
-		&utls.FakeDelegatedCredentialsExtension{
-			SupportedSignatureAlgorithms: []utls.SignatureScheme{
-				utls.ECDSAWithP256AndSHA256,
-				utls.ECDSAWithP384AndSHA384,
-				utls.ECDSAWithP521AndSHA512,
-				utls.ECDSAWithSHA1,
-			},
-		},
-		&utls.SCTExtension{},
-		&utls.KeyShareExtension{
-			KeyShares: append(
-				utls.ReuseHybridAndClassicalKeyShares(
+			&utls.SCTExtension{},
+			&utls.KeyShareExtension{
+				KeyShares: append(
+					utls.ReuseHybridAndClassicalKeyShares(
+						utls.KeyShare{
+							Group: utls.X25519MLKEM768,
+						},
+						utls.KeyShare{
+							Group: utls.X25519,
+						},
+					),
 					utls.KeyShare{
-						Group: utls.X25519MLKEM768,
-					},
-					utls.KeyShare{
-						Group: utls.X25519,
+						Group: utls.CurveP256,
 					},
 				),
-				utls.KeyShare{
-					Group: utls.CurveP256,
-				},
-			),
-		},
-		&utls.SupportedVersionsExtension{
-			Versions: []uint16{
-				utls.VersionTLS13,
-				utls.VersionTLS12,
 			},
-		},
-		&utls.SignatureAlgorithmsExtension{
-			SupportedSignatureAlgorithms: []utls.SignatureScheme{
-				utls.ECDSAWithP256AndSHA256,
-				utls.ECDSAWithP384AndSHA384,
-				utls.ECDSAWithP521AndSHA512,
-				utls.PSSWithSHA256,
-				utls.PSSWithSHA384,
-				utls.PSSWithSHA512,
-				utls.PKCS1WithSHA256,
-				utls.PKCS1WithSHA384,
-				utls.PKCS1WithSHA512,
-				utls.ECDSAWithSHA1,
-				utls.PKCS1WithSHA1,
-			},
-		},
-		&utls.PSKKeyExchangeModesExtension{
-			Modes: []uint8{dicttls.PSKKeyExchangeMode_psk_dhe_ke},
-		},
-		&utls.FakeRecordSizeLimitExtension{
-			Limit: 0x4001,
-		},
-		&utls.UtlsCompressCertExtension{Algorithms: []utls.CertCompressionAlgo{
-			utls.CertCompressionZlib,
-			utls.CertCompressionBrotli,
-			utls.CertCompressionZstd,
-		}},
-		&utls.GREASEEncryptedClientHelloExtension{
-			CandidateCipherSuites: []utls.HPKESymmetricCipherSuite{
-				{
-					KdfId:  dicttls.HKDF_SHA256,
-					AeadId: dicttls.AEAD_AES_128_GCM,
-				},
-				{
-					KdfId:  dicttls.HKDF_SHA256,
-					AeadId: dicttls.AEAD_CHACHA20_POLY1305,
+			&utls.SupportedVersionsExtension{
+				Versions: []uint16{
+					utls.VersionTLS13,
+					utls.VersionTLS12,
 				},
 			},
-			CandidatePayloadLens: []uint16{223}, // +16: 239
+			&utls.SignatureAlgorithmsExtension{
+				SupportedSignatureAlgorithms: []utls.SignatureScheme{
+					utls.ECDSAWithP256AndSHA256,
+					utls.ECDSAWithP384AndSHA384,
+					utls.ECDSAWithP521AndSHA512,
+					utls.PSSWithSHA256,
+					utls.PSSWithSHA384,
+					utls.PSSWithSHA512,
+					utls.PKCS1WithSHA256,
+					utls.PKCS1WithSHA384,
+					utls.PKCS1WithSHA512,
+					utls.ECDSAWithSHA1,
+					utls.PKCS1WithSHA1,
+				},
+			},
+			&utls.PSKKeyExchangeModesExtension{
+				Modes: []uint8{dicttls.PSKKeyExchangeMode_psk_dhe_ke},
+			},
+			&utls.FakeRecordSizeLimitExtension{
+				Limit: 0x4001,
+			},
+			&utls.UtlsCompressCertExtension{Algorithms: []utls.CertCompressionAlgo{
+				utls.CertCompressionZlib,
+				utls.CertCompressionBrotli,
+				utls.CertCompressionZstd,
+			}},
+			&utls.GREASEEncryptedClientHelloExtension{
+				CandidateCipherSuites: []utls.HPKESymmetricCipherSuite{
+					{
+						KdfId:  dicttls.HKDF_SHA256,
+						AeadId: dicttls.AEAD_AES_128_GCM,
+					},
+					{
+						KdfId:  dicttls.HKDF_SHA256,
+						AeadId: dicttls.AEAD_CHACHA20_POLY1305,
+					},
+				},
+				CandidatePayloadLens: []uint16{223}, // +16: 239
+			},
+			&utls.UtlsPreSharedKeyExtension{},
 		},
-		&utls.UtlsPreSharedKeyExtension{})
-	uconn.ApplyPreset(spec)
+	})
 
 	err = uconn.Handshake()
 	if err != nil {
@@ -782,6 +768,24 @@ func init() {
 			}
 
 			tracksCacheLock.Unlock()
+
+			// streams are related to tracks so same as track cache clean delay :D
+			StreamCacheMut.Lock()
+
+			now = time.Now()
+			for key, val := range StreamCache {
+				if val.Expires.Before(now) {
+					delete(StreamCache, key)
+					if val.Value.Base != nil {
+						fasthttp.ReleaseURI(val.Value.Base)
+					}
+					if val.Value.Playlist != nil {
+						fasthttp.ReleaseURI(val.Value.Playlist)
+					}
+				}
+			}
+
+			StreamCacheMut.Unlock()
 		}
 	}()
 
