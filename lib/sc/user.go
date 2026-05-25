@@ -302,6 +302,7 @@ func (u *User) GetWebProfiles() error {
 	baseUriReq(req)
 	req.URI().SetPath("/users/soundcloud:users:" + string(u.ID) + "/web-profiles")
 	req.URI().QueryArgs().Set("client_id", ClientID)
+	Authorize(req)
 	req.Header.SetUserAgent(cfg.UserAgent)
 	req.Header.Set("Accept-Encoding", "gzip, deflate, br, zstd")
 
@@ -449,7 +450,7 @@ func (u *User) GenerateFeed(ctx context.Context, prefs cfg.Preferences, base str
 				continue
 			}
 
-			item.Description = buf.String()
+			item.Description.Description = buf.String()
 			f.Items = append(f.Items, &item)
 		}
 	} else {
