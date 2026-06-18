@@ -5,7 +5,7 @@ go 1.26.3
 require (
 	github.com/a-h/templ v0.3.1020
 	github.com/bogem/id3v2/v2 v2.1.4
-	github.com/dlclark/regexp2/v2 v2.1.0
+	github.com/dlclark/regexp2/v2 v2.1.1
 	github.com/gcottom/mp4meta v0.0.5
 	github.com/goccy/go-json v0.10.6
 	github.com/gofiber/fiber/v3 v3.3.0
@@ -15,7 +15,7 @@ require (
 )
 
 require (
-	git.maid.zone/stuff/soundcloakctl v0.0.0-20260424203915-ef7e565cf76f // indirect
+	git.maid.zone/stuff/soundcloakctl v0.0.0-20260530153525-364d377da90f // indirect
 	github.com/a-h/parse v0.0.0-20250122154542-74294addb73e // indirect
 	github.com/abema/go-mp4 v1.6.0 // indirect
 	github.com/aler9/writerseeker v1.1.0 // indirect
@@ -29,7 +29,7 @@ require (
 	github.com/gofiber/utils/v2 v2.0.6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
-	github.com/mattn/go-colorable v0.1.14 // indirect
+	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/natefinch/atomic v1.0.1 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
