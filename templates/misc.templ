@@ -1,14 +1,14 @@
 package templates
 
 import (
-    "git.maid.zone/stuff/soundcloak/lib/cfg"
-	"git.maid.zone/stuff/soundcloak/lib/sc"
-    "git.maid.zone/stuff/soundcloak/lib/textparsing"
-	"github.com/valyala/fasthttp"
 	"context"
+	"git.maid.zone/stuff/soundcloak/lib/cfg"
+	"git.maid.zone/stuff/soundcloak/lib/sc"
+	"git.maid.zone/stuff/soundcloak/lib/textparsing"
+	"github.com/valyala/fasthttp"
 	"io"
-	"strconv"
 	"net/url"
+	"strconv"
 )
 
 templ Description(prefs cfg.Preferences, text string, injected templ.Component) {
@@ -37,7 +37,6 @@ func Bytes(b []byte) templ.Component {
 		return err
 	})
 }
-
 
 templ UserPlaylistTrackItem(pl *sc.UserPlaylistTrack) {
 	<a class="listing" href={ templ.SafeURL(pl.Href()) }>
@@ -71,7 +70,7 @@ templ UserPlaylistTrackItem(pl *sc.UserPlaylistTrack) {
 
 templ Search(p *sc.Paginated[*sc.UserPlaylistTrack], prefs cfg.Preferences, content string) {
 	@searchbar(prefs, content, "any")
-	<br>
+	<br/>
 	<span>Found { strconv.FormatInt(p.Total, 10) } results</span>
 	<br/>
 	<br/>
@@ -91,7 +90,7 @@ templ searchbar(p cfg.Preferences, content string, typ string) {
 	<form action="/search">
 		<div style="position:relative">
 			<div style="display:flex;gap:.5rem">
-				<input id="q" name="q" type="text" autocomplete="off" autofill="off" value={content} style="padding:.5rem.6rem;flex-grow:1"/>
+				<input id="q" name="q" type="text" autocomplete="off" autofill="off" value={ content } style="padding:.5rem.6rem;flex-grow:1"/>
 				@sel("type", []option{
 					{"any", "Anything", false},
 					{"tracks", "Tracks", false},

@@ -21,14 +21,14 @@ func playlist(t sc.Track, p sc.Playlist) string {
 
 templ PlaylistItem(playlist *sc.Playlist, showUsername bool) {
 	<a class="listing" href={ templ.SafeURL(playlist.Href()) }>
-		<img 
-			loading="lazy" 
+		<img
+			loading="lazy"
 			fetchpriority="low"
-		if playlist.Artwork != "" {
-			src={ playlist.Artwork }
-		} else {
-			src="/_/static/placeholder.jpg"
-		}
+			if playlist.Artwork != "" {
+				src={ playlist.Artwork }
+			} else {
+				src="/_/static/placeholder.jpg"
+			}
 		/>
 		<div class="meta">
 			<h3>{ playlist.Title }</h3>
@@ -81,7 +81,7 @@ templ Playlist(prefs cfg.Preferences, p sc.Playlist) {
 
 templ SearchPlaylists(p *sc.Paginated[*sc.Playlist], prefs cfg.Preferences, content string) {
 	@searchbar(prefs, content, "playlists")
-	<br>
+	<br/>
 	<span>Found { strconv.FormatInt(p.Total, 10) } playlists</span>
 	<br/>
 	<br/>

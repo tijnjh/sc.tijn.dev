@@ -11,21 +11,21 @@ templ TrackButtons(current string, track sc.Track) {
 	<div class="btns">
 		for _, b := range [...]btn{{"related tracks", "/recommended", false, false},{"in albums", "/albums", false, false},{"in playlists", "/sets", false, false},{"track station", "/discover/sets/"+track.Station, true, false},{"view on soundcloud", "https://soundcloud.com"+track.Href(), true, true}} {
 			<a
-			if b.text == current {
-				class="btn active"
-			} else {
-				class="btn"
-				if b.override {
-					href={ templ.SafeURL(b.href) }
+				if b.text == current {
+					class="btn active"
 				} else {
-					href={ templ.SafeURL(track.Href() + b.href) }
+					class="btn"
+					if b.override {
+						href={ templ.SafeURL(b.href) }
+					} else {
+						href={ templ.SafeURL(track.Href() + b.href) }
+					}
+					if b.external {
+						referrerpolicy="no-referrer"
+						rel="external nofollow noopener noreferrer"
+						target="_blank"
+					}
 				}
-				if b.external {
-					referrerpolicy="no-referrer" 
-					rel="external nofollow noopener noreferrer" 
-					target="_blank"
-				}
-			}
 			>{ b.text }</a>
 		}
 	</div>
@@ -74,28 +74,25 @@ templ TrackPlayer(prefs cfg.Preferences, track sc.Track, transcoding *sc.Transco
 	}
 	if displayErr == "" {
 		if stream.URL != "" {
-			<audio 
-				id="track" 
-				src={ stream.URL } 
-				controls 
+			<audio
+				id="track"
+				src={ stream.URL }
+				controls
 				autoplay?={ autoplay }
-			if nextTrack != nil {
-				data-next={ next(&track, nextTrack, playlist, mode, "") } 
-				volume={ volume }	
-			}
-			if *prefs.FullyPreloadTrack {
-				preload="yes"
-			}
-			if stream.License != "" {
-				license={ stream.License }
-			}
+				if nextTrack != nil {
+					data-next={ next(&track, nextTrack, playlist, mode, "") }
+					volume={ volume }
+				}
+				if *prefs.FullyPreloadTrack {
+					preload="yes"
+				}
+				if stream.License != "" {
+					license={ stream.License }
+				}
 			></audio>
 		}
 		if *prefs.Player == cfg.HLSPlayer {
-			<script
-				async
-				src="/_/static/player.js"
-			></script>
+			<script async src="/_/static/player.js"></script>
 		} else if nextTrack != nil {
 			<script async src="/_/static/restream.js"></script>
 		}
@@ -106,15 +103,16 @@ templ TrackPlayer(prefs cfg.Preferences, track sc.Track, transcoding *sc.Transco
 			<br/>
 			JavaScript is disabled! Audio playback may not work without it enabled. 
 			<br/>
-			<a class="link" href="/_/preferences">You can enable 
-			if cfg.Restream { 
-				Restream or Progressive
-			} else {
-				Progressive
-			}
-			player in the preferences. It works without JavaScript.</a>
+			<a class="link" href="/_/preferences">
+				You can enable 
+				if cfg.Restream {
+					Restream or Progressive
+				} else {
+					Progressive
+				}
+				player in the preferences. It works without JavaScript.
+			</a>
 		</noscript>
-		
 		if *prefs.Waveform {
 			@track.RenderWaveform()
 		}
@@ -125,16 +123,17 @@ templ TrackPlayer(prefs cfg.Preferences, track sc.Track, transcoding *sc.Transco
 		}
 		if track.Media.HasDRM() {
 			<div>
-				<p>Soundcloud is enforcing DRM on this track, so it may not be able to play.
-				switch *prefs.Player {
-					case cfg.HLSPlayer:
-						if !*prefs.DRM {
-							<a href="/_/preferences">You can enable DRM in preferences</a> and in your browser settings
-						}
-					case cfg.RestreamPlayer, cfg.ProgressivePlayer:
-						<a href="/_/preferences">You can enable HLS player and DRM in preferences</a>. You must also enable it in your browser settings
-				}
-			</p>
+				<p>
+					Soundcloud is enforcing DRM on this track, so it may not be able to play.
+					switch *prefs.Player {
+						case cfg.HLSPlayer:
+							if !*prefs.DRM {
+								<a href="/_/preferences">You can enable DRM in preferences</a> and in your browser settings
+							}
+						case cfg.RestreamPlayer, cfg.ProgressivePlayer:
+							<a href="/_/preferences">You can enable HLS player and DRM in preferences</a>. You must also enable it in your browser settings
+					}
+				</p>
 			</div>
 		}
 		if *prefs.ShowAudio {
@@ -157,14 +156,14 @@ templ TrackItem(track *sc.Track, showUsername bool, overrideHref string) {
 			}
 		}}
 		<a class="listing" href={ templ.SafeURL(overrideHref) }>
-			<img 
-				loading="lazy" 
+			<img
+				loading="lazy"
 				fetchpriority="low"
-			if track.Artwork != "" {
-				src={ track.Artwork }
-			} else {
-				src="/_/static/placeholder.jpg"
-			}
+				if track.Artwork != "" {
+					src={ track.Artwork }
+				} else {
+					src="/_/static/placeholder.jpg"
+				}
 			/>
 			<div class="meta">
 				<h3>{ track.Title }</h3>
@@ -187,7 +186,6 @@ templ Track(prefs cfg.Preferences, t sc.Track, tr *sc.Transcoding, stream sc.Str
 			<a class="btn" href={ templ.SafeURL("/_/download" + t.Href()) }>download</a>
 		</div>
 	}
-
 	<div id="addToFavorites" class="listing" style="width: fit-content; margin-block-start: 1rem; cursor: pointer;"></div>
 	<div id="track-data" data-title={ t.Title } data-artist={ t.Author.Username } data-artwork-url={ t.Artwork }></div>
 	<script>
@@ -237,7 +235,6 @@ templ Track(prefs cfg.Preferences, t sc.Track, tr *sc.Transcoding, stream sc.Str
 			});
 		}
 	</script>
-
 	if t.Genre != "" {
 		<a href={ templ.SafeURL("/tags/" + t.Genre) }><p class="tag">{ t.Genre }</p></a>
 	}
@@ -330,11 +327,11 @@ templ Comments(comments *sc.Paginated[*sc.Comment]) {
 	for _, c := range comments.Collection {
 		<div class="listing">
 			<img
-			if c.Author.Avatar != "" {
-				src={ c.Author.Avatar }
-			} else {
-				src="/_/static/placeholder.jpg"
-			}
+				if c.Author.Avatar != "" {
+					src={ c.Author.Avatar }
+				} else {
+					src="/_/static/placeholder.jpg"
+				}
 			/>
 			<div class="comment">
 				<h3 class="link"><a href={ templ.SafeURL("/" + c.Author.Permalink) }>{ c.Author.Username }</a></h3>
@@ -366,7 +363,7 @@ templ TrackEmbed(prefs cfg.Preferences, t sc.Track, tr *sc.Transcoding, stream s
 
 templ SearchTracks(p *sc.Paginated[*sc.Track], prefs cfg.Preferences, content string) {
 	@searchbar(prefs, content, "tracks")
-	<br>
+	<br/>
 	<span>Found { strconv.FormatInt(p.Total, 10) } tracks</span>
 	<br/>
 	<br/>

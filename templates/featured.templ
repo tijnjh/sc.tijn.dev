@@ -14,13 +14,11 @@ templ Discover(p *sc.Paginated[*sc.Selection]) {
 			if len(selection.Items.Collection) == 0 {
 				{{ continue }} // raw go code my beloved
 			}
-
-			<h2>{selection.Title}</h2>
+			<h2>{ selection.Title }</h2>
 			for _, pl := range selection.Items.Collection {
 				@UserPlaylistTrackItem(pl)
 			}
 		}
-
 		// I don't think they have pagination for this endpoint, just leaving this here, in case they actually do
 		// if p.Next != "" {
 		// 	<a class="btn" href={ templ.URL("/discover?pagination=" + url.QueryEscape(strings.Split(p.Next, "/discover")[1])) } rel="noreferrer">more playlists</a>
