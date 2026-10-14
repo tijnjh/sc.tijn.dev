@@ -1193,22 +1193,32 @@ func (t *Track) Postfix(prefs cfg.Preferences, fixAuthor bool) {
 }
 
 func (t Track) FormatDescription() string {
-	desc := t.Description
+	desc := strings.Builder{}
 	if t.Description != "" {
-		desc += "\n\n"
+		desc.WriteString(t.Description)
+		desc.WriteByte('\n')
 	}
 
-	desc += strconv.FormatInt(t.Likes, 10) + " ❤️ | " + strconv.FormatInt(t.Played, 10) + " ▶️ | " + strconv.FormatInt(t.Reposted, 10) + " 🔁"
+	desc.WriteString(misc.HumanizeNumber(t.Likes))
+	desc.WriteString(" ❤️ | ")
+	desc.WriteString(misc.HumanizeNumber(t.Played))
+	desc.WriteString(" ▶️ | ")
+	desc.WriteString(misc.HumanizeNumber(t.Reposted))
+	desc.WriteString(" 🔁")
 	if t.Genre != "" {
-		desc += "\nGenre: " + t.Genre
+		desc.WriteString("\nGenre: ")
+		desc.WriteString(t.Genre)
 	}
-	desc += "\nCreated: " + t.CreatedAt
-	desc += "\nLast modified: " + t.LastModified
+	desc.WriteString("\nCreated: ")
+	desc.WriteString(misc.TryFormatRfc3339(t.CreatedAt))
+	desc.WriteString("\nLast modified: ")
+	desc.WriteString(misc.TryFormatRfc3339(t.LastModified))
 	if len(t.TagList) != 0 {
-		desc += "\nTags: " + TagListParser(t.TagList)
+		desc.WriteString("\nTags: ")
+		TagListParserSB(t.TagList, &desc)
 	}
 
-	return desc
+	return desc.String()
 }
 
 func GetTrackByID(id string) (Track, error) {
@@ -1425,7 +1435,44 @@ func (t *Track) RenderWaveform() templ.Component {
 			count++
 			ww.Write(b)
 		}
-		ww.WriteString(`" stroke="var(--0)" fill="none" stroke-width="0.6"/></svg><script async src="/_/static/waveform.js"></script>`)
+		ww.WriteString(`" stroke="var(--0)" fill="none" stroke-width="0.6"/></svg>`)
 		return nil
 	})
+}
+
+func (t *Track) GetDisabledFormats() map[string]bool {
+	disabled_formats := map[string]bool{
+		cfg.AudioAACHQ: true,
+		cfg.AudioAAC:   true,
+		cfg.AudioMP3:   true,
+		cfg.AudioAACLQ: true,
+	}
+
+	for _, tr := range t.Media.Transcodings {
+		switch tr.Format.Protocol {
+		case ProtocolHLS:
+			switch tr.Preset {
+			case "aac_256k":
+				disabled_formats[cfg.AudioAACHQ] = false
+			case "aac_160k":
+				disabled_formats[cfg.AudioAAC] = false
+			case "aac_96k":
+				disabled_formats[cfg.AudioAACLQ] = false
+			default:
+				switch tr.Format.MimeType {
+				case "audio/mpeg":
+					disabled_formats[cfg.AudioMP3] = false
+				case `audio/mp4; codecs="mp4a.40.2"`:
+					disabled_formats[cfg.AudioAACHQ] = false
+				}
+
+			}
+		case ProtocolProgressive:
+			if tr.Format.MimeType == "audio/mpeg" {
+				disabled_formats[cfg.AudioMP3] = false
+			}
+		}
+	}
+
+	return disabled_formats
 }

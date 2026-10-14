@@ -2,6 +2,7 @@ package templates
 
 import (
 	"git.maid.zone/stuff/soundcloak/lib/cfg"
+	"git.maid.zone/stuff/soundcloak/lib/misc"
 	"git.maid.zone/stuff/soundcloak/lib/sc"
 	"net/url"
 	"strconv"
@@ -56,17 +57,23 @@ templ UserLinks(links []sc.Link) {
 }
 
 templ UserBase(prefs cfg.Preferences, u sc.User) {
-	<div>
+	<div class="hero-section">
 		if u.Avatar != "" {
 			<img src={ u.Avatar } width="300px"/>
 		}
-		<h1>{ u.Username }</h1>
-		if u.FullName != "" {
-			<h2>{ u.FullName }</h2>
-		}
-		if u.Verified {
-			<p style="color: var(--accent)">Verified</p>
-		}
+		<div>
+			<h1>{ u.Username }</h1>
+			if u.FullName != "" {
+				<h2>{ u.FullName }</h2>
+			}
+			if u.Verified {
+				<p style="color: var(--accent)">Verified</p>
+			}
+			<hr/>
+			<p><a class="link" href={ templ.SafeURL("/" + u.Permalink + "/followers") }><span title={ u.Followers }>{ misc.HumanizeNumber(u.Followers) }</span> followers</a></p>
+			<p><a class="link" href={ templ.SafeURL("/" + u.Permalink + "/following") }><span title={ u.Following }>{ misc.HumanizeNumber(u.Following) }</span> followings</a></p>
+			<p><a class="link" href={ templ.SafeURL("/" + u.Permalink + "/likes") }><span title={ u.Liked }>{ misc.HumanizeNumber(u.Liked) }</span> liked</a></p>
+		</div>
 	</div>
 	if len(u.WebProfiles) != 0 {
 		@Description(prefs, u.Description, UserLinks(u.WebProfiles))
@@ -74,16 +81,18 @@ templ UserBase(prefs cfg.Preferences, u sc.User) {
 		@Description(prefs, u.Description, nil)
 	}
 	<div>
-		<p><a class="link" href={ templ.SafeURL("/" + u.Permalink + "/followers") }>{ strconv.FormatInt(u.Followers, 10) } followers</a></p>
-		<p><a class="link" href={ templ.SafeURL("/" + u.Permalink + "/following") }>{ strconv.FormatInt(u.Following, 10) } followings</a></p>
-		<p><a class="link" href={ templ.SafeURL("/" + u.Permalink + "/likes") }>{ strconv.FormatInt(u.Liked, 10) } liked</a></p>
-		<p>{ strconv.FormatInt(u.Tracks, 10) } tracks</p>
-		<p>{ strconv.FormatInt(u.Playlists, 10) } playlists & albums</p>
-		<br/>
-		if u.CreatedAt != "" {
-			<p>Created: { u.CreatedAt }</p>
-		}
-		<p>Last modified: { u.LastModified }</p>
+		<dl>
+			<dt>Tracks</dt>
+			<dd>{ strconv.FormatInt(u.Tracks, 10) }</dd>
+			<dt>Playlists and albums</dt>
+			<dd>{ strconv.FormatInt(u.Playlists, 10) }</dd>
+			if u.CreatedAt != "" {
+				<dt>Created</dt>
+				<dd>{ misc.TryFormatRfc3339(u.CreatedAt) }</dd>
+			}
+			<dt>Last modified</dt>
+			<dd>{ misc.TryFormatRfc3339(u.LastModified) }</dd>
+		</dl>
 	</div>
 }
 
@@ -114,7 +123,9 @@ templ UserButtons(current string, user sc.User) {
 						target="_blank"
 					}
 				}
-			>{ b.text }</a>
+			>
+				{ b.text }
+			</a>
 		}
 	</div>
 }
@@ -286,8 +297,6 @@ templ UserFollowing(prefs cfg.Preferences, u sc.User, p *sc.Paginated[*sc.User])
 }
 
 templ SearchUsers(p *sc.Paginated[*sc.User], prefs cfg.Preferences, content string) {
-	@searchbar(prefs, content, "users")
-	<br/>
 	<span>Found { strconv.FormatInt(p.Total, 10) } users</span>
 	<br/>
 	<br/>

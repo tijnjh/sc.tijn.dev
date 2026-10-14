@@ -98,10 +98,6 @@ func Defaults(dst *cfg.Preferences) {
 		dst.SearchSuggestions = cfg.DefaultPreferences.SearchSuggestions
 	}
 
-	if dst.DynamicLoadComments == nil {
-		dst.DynamicLoadComments = cfg.DefaultPreferences.DynamicLoadComments
-	}
-
 	if dst.KeepPlayerFocus == nil {
 		dst.KeepPlayerFocus = cfg.DefaultPreferences.KeepPlayerFocus
 	}
@@ -115,12 +111,39 @@ func Defaults(dst *cfg.Preferences) {
 	}
 }
 
+// handrolled cookie parser
+// because fasthttp version 1.72.0 won't parse cookies with " ; \
+// https://github.com/valyala/fasthttp/commit/eb82c9a13addbe488f69cbf530444bb2561fd083
 func Get(c fiber.Ctx) (p cfg.Preferences, err error) {
-	rawprefs := c.Request().Header.Cookie("prefs")
-	if len(rawprefs) > 2 {
-		err = json.Unmarshal(rawprefs, &p)
-		if err != nil {
-			return
+	b := c.Request().Header.Peek("Cookie")
+	if len(b) != 0 {
+		isKey := true
+		k := 0
+		for i, v := range b {
+			if v == '=' && isKey {
+				isKey = false
+				for b[k] == ' ' {
+					k++
+				}
+				if string(b[k:i]) == "prefs" {
+					i++
+					end := len(b)
+					for j, c := range b[i:] {
+						if c == ';' {
+							end = j + i
+							break
+						}
+					}
+					err = json.Unmarshal(b[i:end], &p)
+					if err != nil {
+						return
+					}
+					break
+				}
+			} else if v == ';' {
+				isKey = true
+				k = i + 1
+			}
 		}
 	}
 	Defaults(&p)
@@ -142,10 +165,10 @@ type PrefsForm struct {
 	DownloadAudio            string
 	ShowAudio                string
 	SearchSuggestions        string
-	DynamicLoadComments      string
 	KeepPlayerFocus          string
 	Waveform                 string
 	DRM                      string
+	AutoAudio                string
 }
 
 type Export struct {
@@ -179,12 +202,12 @@ func Load(r *fiber.App) {
 		}
 
 		c.Response().Header.SetContentType("text/html")
-		return templates.Base("preferences", templates.Preferences(p), nil).Render(context.Background(), c)
+		return templates.Base(p, "preferences", templates.Preferences(p), nil, templates.HeaderOptions{}).Render(context.Background(), c)
 	})
 
 	r.Post("/_/preferences", func(c fiber.Ctx) error {
 		var p PrefsForm
-		err := c.Bind().Body(&p)
+		err := c.Bind().Form(&p)
 		if err != nil {
 			return err
 		}
@@ -216,53 +239,59 @@ func Load(r *fiber.App) {
 			old.ShowAudio = &cfg.False
 		}
 
-		if *old.Player == cfg.HLSPlayer || *old.Player == cfg.ProgressivePlayer {
-			if cfg.ProxyStreams {
-				switch p.ProxyStreams {
-				case on:
-					old.ProxyStreams = &cfg.True
-				case "":
-					old.ProxyStreams = &cfg.False
+		if *old.Player != cfg.RestreamPlayer {
+			switch p.ProxyStreams {
+			case on:
+				old.ProxyStreams = &cfg.True
+			case "":
+				old.ProxyStreams = &cfg.False
+			}
+		}
+
+		if *old.Player == cfg.HLSPlayer || *old.Player == cfg.AutoPlayer {
+			if p.FullyPreloadTrack == on {
+				old.FullyPreloadTrack = &cfg.True
+			} else {
+				old.FullyPreloadTrack = &cfg.False
+			}
+
+			if p.DRM == on {
+				old.DRM = &cfg.True
+			} else {
+				old.DRM = &cfg.False
+			}
+		}
+
+		if cfg.Restream {
+			old.DownloadAudio = &p.DownloadAudio
+		}
+
+		switch *old.Player {
+		case cfg.HLSPlayer:
+			old.HLSAudio = &p.HLSAudio
+		case cfg.ProgressivePlayer:
+			old.ProgressiveAudio = &p.ProgressiveAudio
+		case cfg.RestreamPlayer:
+			old.RestreamAudio = &p.RestreamAudio
+		case cfg.AutoPlayer:
+			old.HLSAudio = &p.AutoAudio
+			old.RestreamAudio = &p.AutoAudio
+			switch p.AutoAudio {
+			case cfg.AudioAACHQ, cfg.AudioMP3:
+				old.ProgressiveAudio = &p.AutoAudio
+			default:
+				if len(cfg.AccountTokens) != 0 && p.AutoAudio == cfg.AudioAAC {
+					old.ProgressiveAudio = &p.AutoAudio
+				} else {
+					old.ProgressiveAudio = &cfg.MP3
 				}
 			}
 		}
 
-		if *old.Player == cfg.HLSPlayer {
-			switch p.FullyPreloadTrack {
-			case on:
-				old.FullyPreloadTrack = &cfg.True
-			case "":
-				old.FullyPreloadTrack = &cfg.False
-			}
-
-			switch p.DRM {
-			case on:
-				old.DRM = &cfg.True
-			case "":
-				old.DRM = &cfg.False
-
-			}
-
-			old.HLSAudio = &p.HLSAudio
-		}
-
-		if cfg.Restream {
-			if *old.Player == cfg.RestreamPlayer {
-				old.RestreamAudio = &p.RestreamAudio
-			}
-
-			old.DownloadAudio = &p.DownloadAudio
-		}
-
-		if *old.Player == cfg.ProgressivePlayer {
-			old.ProgressiveAudio = &p.ProgressiveAudio
-		}
-
 		if cfg.ProxyImages {
-			switch p.ProxyImages {
-			case on:
+			if p.ProxyImages == on {
 				old.ProxyImages = &cfg.True
-			case "":
+			} else {
 				old.ProxyImages = &cfg.False
 			}
 		}
@@ -277,12 +306,6 @@ func Load(r *fiber.App) {
 			old.SearchSuggestions = &cfg.True
 		} else {
 			old.SearchSuggestions = &cfg.False
-		}
-
-		if p.DynamicLoadComments == on {
-			old.DynamicLoadComments = &cfg.True
-		} else {
-			old.DynamicLoadComments = &cfg.False
 		}
 
 		if p.KeepPlayerFocus == on {

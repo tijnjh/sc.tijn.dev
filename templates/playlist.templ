@@ -2,7 +2,9 @@ package templates
 
 import (
 	"git.maid.zone/stuff/soundcloak/lib/cfg"
+	"git.maid.zone/stuff/soundcloak/lib/misc"
 	"git.maid.zone/stuff/soundcloak/lib/sc"
+
 	"net/url"
 	"strconv"
 )
@@ -41,17 +43,36 @@ templ PlaylistItem(playlist *sc.Playlist, showUsername bool) {
 }
 
 templ Playlist(prefs cfg.Preferences, p sc.Playlist) {
-	if p.Artwork != "" {
-		<img src={ p.Artwork } width="300px"/>
-	}
-	<h1>{ p.Title }</h1>
-	@UserItem(&p.Author)
-	<div style="display: flex;">
-		<a class="btn" href={ templ.SafeURL("https://soundcloud.com" + p.Href()) }>view on soundcloud</a>
+	<div class="hero-section">
+		if p.Artwork != "" {
+			<img src={ p.Artwork } width="300px"/>
+		}
+		<div style="width: 100%">
+			<h1>{ p.Title }</h1>
+			@UserItem(&p.Author)
+			<a class="btn" style="width: fit-content" href={ templ.SafeURL("https://soundcloud.com" + p.Href()) }>view on soundcloud</a>
+		</div>
 	</div>
 	<br/>
 	@Description(prefs, p.Description, nil)
-	<p>{ strconv.FormatInt(p.TracksCount(), 10) } tracks</p>
+	<dl>
+		<dt>Tracks</dt>
+		<dd>{ strconv.FormatInt(p.TracksCount(), 10) }</dd>
+		if p.TagList != "" {
+			<dt>Tags</dt>
+			<dd>{ sc.TagListParser(p.TagList) }</dd>
+		}
+		if p.CreatedAt != "" {
+			<dt>Created</dt>
+			<dd>{ misc.TryFormatRfc3339(p.CreatedAt) }</dd>
+		}
+		<dt>Last modified</dt>
+		<dd>{ misc.TryFormatRfc3339(p.LastModified) }</dd>
+		<dt>Likes</dt>
+		<dd>{ misc.HumanizeNumber(p.Likes) }</dd>
+		<dt>Reposts</dt>
+		<dd>{ misc.HumanizeNumber(p.Reposts) }</dd>
+	</dl>
 	<br/>
 	<br/>
 	<div>
@@ -66,22 +87,9 @@ templ Playlist(prefs cfg.Preferences, p sc.Playlist) {
 	if len(p.MissingTracks) != 0 {
 		<a class="btn" href={ templ.SafeURL("?pagination=" + url.QueryEscape(p.MissingTracks)) } rel="noreferrer">more tracks</a>
 	}
-	<div>
-		if p.TagList != "" {
-			<p>Tags: { sc.TagListParser(p.TagList) }</p>
-		}
-		<p>{ strconv.FormatInt(p.Likes, 10) } likes</p>
-		<br/>
-		if p.CreatedAt != "" {
-			<p>Created: { p.CreatedAt }</p>
-		}
-		<p>Last modified: { p.LastModified }</p>
-	</div>
 }
 
 templ SearchPlaylists(p *sc.Paginated[*sc.Playlist], prefs cfg.Preferences, content string) {
-	@searchbar(prefs, content, "playlists")
-	<br/>
 	<span>Found { strconv.FormatInt(p.Total, 10) } playlists</span>
 	<br/>
 	<br/>

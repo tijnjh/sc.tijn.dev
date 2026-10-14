@@ -120,28 +120,8 @@ var EmbedFiles = true
 
 // // end of config // //
 
-// defaults are:
-// Player: RestreamPlayer if Restream is enabled, otherwise - HLSPlayer
-// ProxyStreams: same as ProxyStreams in your config (false by default)
-// FullyPreloadTrack: false
-// ProxyImages: same as ProxyImages in your config (false by default)
-// ParseDescriptions: true
-// AutoplayNextTrack: false
-// DefaultAutoplayMode: AutoplayNormal
-// HLSAudio: AudioMP3
-// RestreamAudio: AudioMP3
-// DownloadAudio: AudioMP3
-// ShowAudio: false
-// SearchSuggestions: false
-// DynamicLoadComments: false
 func defaultPreferences() {
-	var p string
-	if Restream {
-		p = RestreamPlayer
-	} else {
-		p = HLSPlayer
-	}
-	DefaultPreferences.Player = &p
+	DefaultPreferences.Player = &Auto
 
 	DefaultPreferences.ProxyStreams = &ProxyStreams
 
@@ -164,9 +144,8 @@ func defaultPreferences() {
 	DefaultPreferences.ShowAudio = &False
 
 	DefaultPreferences.SearchSuggestions = &False
-	DefaultPreferences.DynamicLoadComments = &False
 	DefaultPreferences.KeepPlayerFocus = &False
-	DefaultPreferences.Waveform = &False
+	DefaultPreferences.Waveform = &True
 	DefaultPreferences.DRM = &False
 }
 
@@ -174,13 +153,7 @@ func loadDefaultPreferences(loaded Preferences) {
 	if loaded.Player != nil {
 		DefaultPreferences.Player = loaded.Player
 	} else {
-		var p string
-		if Restream {
-			p = RestreamPlayer
-		} else {
-			p = HLSPlayer
-		}
-		DefaultPreferences.Player = &p
+		DefaultPreferences.Player = &Auto
 	}
 
 	if loaded.ProxyStreams != nil {
@@ -286,12 +259,6 @@ func loadDefaultPreferences(loaded Preferences) {
 		DefaultPreferences.SearchSuggestions = &False
 	}
 
-	if loaded.DynamicLoadComments != nil {
-		DefaultPreferences.DynamicLoadComments = loaded.DynamicLoadComments
-	} else {
-		DefaultPreferences.DynamicLoadComments = &False
-	}
-
 	if loaded.KeepPlayerFocus != nil {
 		DefaultPreferences.KeepPlayerFocus = loaded.KeepPlayerFocus
 	} else {
@@ -301,7 +268,7 @@ func loadDefaultPreferences(loaded Preferences) {
 	if loaded.Waveform != nil {
 		DefaultPreferences.Waveform = loaded.Waveform
 	} else {
-		DefaultPreferences.Waveform = &False
+		DefaultPreferences.Waveform = &True
 	}
 
 	if loaded.DRM != nil {

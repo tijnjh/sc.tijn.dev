@@ -2,7 +2,12 @@ package templates
 
 import "git.maid.zone/stuff/soundcloak/lib/cfg"
 
-templ Base(title string, content templ.Component, head templ.Component) {
+type HeaderOptions struct {
+	SearchQuery string
+	SearchType  string
+}
+
+templ Base(p cfg.Preferences, title string, content templ.Component, head templ.Component, options HeaderOptions) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
@@ -22,36 +27,71 @@ templ Base(title string, content templ.Component, head templ.Component) {
 				@head
 			}
 		</head>
-		<body>
+		<body class="noJs">
+			<script>document.body.classList.remove('noJs')</script>
 			if cfg.Debug {
 				<h1>!! running in debug mode !!</h1>
 			}
-			<div style="display: flex; align-items: center; justify-content: center; gap: 1rem;">
-				<img src="/_/static/cat_with_boombox.jpg" alt="cat with boombox" width="50"/>
-				<a href="/" id="sc"><h1>soundcloak.tijn.dev</h1></a>
+			<div class="header">
+				<div style="display: flex; align-items: center; justify-content: center; gap: 1rem;">
+					<img src="/_/static/cat_with_boombox.jpg" alt="cat with boombox" width="50"/>
+					<a href="/" id="sc"><h1>soundcloak.tijn.dev</h1></a>
+				</div>
+				<form class="header-search" action="/search">
+					<input
+						class="header-search-query"
+						id="q"
+						name="q"
+						type="text"
+						autocomplete="off"
+						autofill="off"
+						placeholder="Search..."
+						value={ options.SearchQuery }
+					/>
+					@sel("type", []option{
+						{"any", "Anything", false},
+						{"tracks", "Tracks", false},
+						{"users", "Users", false},
+						{"playlists", "Playlists", false},
+					}, options.SearchType)
+					if *p.SearchSuggestions {
+						<ul id="search-suggestions" style="display:none"></ul>
+						<script async src="/_/static/search.js"></script>
+					}
+					<input
+						class="header-search-submit"
+						type="submit"
+						value="Search"
+						class="btn"
+					/>
+				</form>
 			</div>
 			@content
 		</body>
 	</html>
 }
 
-templ MainPageHead(p cfg.Preferences) {
-	if *p.SearchSuggestions {
-		<link rel="stylesheet" href="/_/static/index.css"/>
-	}
-}
-
-templ MainPage(p cfg.Preferences) {
-	@searchbar(p, "", "")
+templ MainPage() {
 	<footer>
 		<div style="margin-top:5rem;gap:1rem;display:grid;grid-template:auto/auto auto auto;justify-content:center">
 			<a class="btn" href="/discover">Discover Playlists</a>
 			<a class="btn" href="/_/preferences">Preferences</a>
 			<a class="btn" href="https://git.maid.zone/stuff/soundcloak">Source code</a>
+			<a class="btn" href="/charts">Top Charts</a>
 			<a class="btn" href="/_/static/notice.txt">Legal notice</a>
 			<a class="btn" href="https://tijn.dev/sc.tijn.dev">Instance source code</a>
 		</div>
-		<p style="text-align:center">Build <a class="link" href={ templ.SafeURL(cfg.CommitURL) }>{ cfg.Commit }</a></p>
+		<p style="text-align:center">
+			Build
+			<a
+				class="link"
+				if cfg.CommitURL != "unknown" {
+					href={ templ.SafeURL(cfg.CommitURL) }
+				}
+			>
+				{ cfg.Commit }
+			</a>
+		</p>
 	</footer>
 	<section>
 		<h2>Favorites</h2>

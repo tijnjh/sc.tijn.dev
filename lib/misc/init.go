@@ -2,6 +2,8 @@ package misc
 
 import (
 	"log"
+	"strconv"
+	"time"
 
 	"git.maid.zone/stuff/soundcloak/lib/cfg"
 	"github.com/valyala/fasthttp"
@@ -13,27 +15,67 @@ func Log(what ...any) {
 	}
 }
 
-var HlsClient *fasthttp.HostClient
+func n(b byte) byte {
+	return b/10 + '0'
+}
+
+func n2(b byte) byte {
+	return b%10 + '0'
+}
+
+func FormatTimecode(timecode int) string {
+	timecode /= 1000
+	seconds := byte(timecode % 60)
+	minutes := byte((timecode / 60) % 60)
+	hours := byte(timecode / 3600)
+	if hours != 0 {
+		return string([]byte{n(hours), n2(hours), ':', n(minutes), n2(minutes), ':', n(seconds), n2(seconds)})
+	} else {
+		return string([]byte{n(minutes), n2(minutes), ':', n(seconds), n2(seconds)})
+	}
+}
+
+func HumanizeNumber(input int64) string {
+	if input >= 1_000_000_000 {
+		return strconv.FormatInt(input/1_000_000_000, 10) + "B"
+	} else if input >= 1_000_000 {
+		return strconv.FormatInt(input/1_000_000, 10) + "M"
+	} else if input >= 10_000 {
+		return strconv.FormatInt(input/1_000, 10) + "K"
+	} else {
+		return strconv.FormatInt(input, 10)
+	}
+}
+
+// return the date string forrmatted, or just raw if it fails
+func TryFormatRfc3339(rfc3339 string) string {
+	t, err := time.Parse(time.RFC3339, rfc3339)
+
+	if err != nil {
+		return rfc3339
+	} else {
+		return t.Format("Monday, Jan 2, 2006 at 3:04pm")
+	}
+}
+
+var HlsClient = &fasthttp.HostClient{
+	Addr:                cfg.HLSCDN + ":443",
+	IsTLS:               true,
+	MaxIdleConnDuration: cfg.MaxIdleConnDuration,
+	DialDualStack:       cfg.DialDualStack,
+}
+
+var HlsAacClient = &fasthttp.HostClient{
+	Addr:                cfg.HLSAACCDN + ":443",
+	IsTLS:               true,
+	MaxIdleConnDuration: cfg.MaxIdleConnDuration,
+	DialDualStack:       cfg.DialDualStack,
+}
 var HlsStreamingOnlyClient *fasthttp.HostClient
-var HlsAacClient *fasthttp.HostClient
 var ImageStreamingOnlyClient *fasthttp.HostClient
 
 func init() {
 	if cfg.Restream || cfg.ProxyStreams {
-		HlsClient = &fasthttp.HostClient{
-			Addr:                cfg.HLSCDN + ":443",
-			IsTLS:               true,
-			MaxIdleConnDuration: cfg.MaxIdleConnDuration,
-			DialDualStack:       cfg.DialDualStack,
-		}
-
-		HlsAacClient = &fasthttp.HostClient{
-			Addr:                cfg.HLSAACCDN + ":443",
-			IsTLS:               true,
-			MaxIdleConnDuration: cfg.MaxIdleConnDuration,
-			DialDualStack:       cfg.DialDualStack,
-		}
-
 		HlsStreamingOnlyClient = &fasthttp.HostClient{
 			Addr:                cfg.HLSCDN + ":443",
 			IsTLS:               true,

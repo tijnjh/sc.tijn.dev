@@ -16,7 +16,9 @@ templ TagsButtons(current string, tag string) {
 					class="btn"
 					href={ templ.SafeURL("/tags/" + tag + b.href) }
 				}
-			>{ b.text }</a>
+			>
+				{ b.text }
+			</a>
 		}
 	</div>
 	<br/>

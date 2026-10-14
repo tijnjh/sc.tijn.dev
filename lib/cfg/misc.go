@@ -27,6 +27,18 @@ var Repo = "unknown"
 var CommitURL = "unknown"
 
 const (
+	// choose best for the conditions =>
+	// if policy snip => restream/progressive only
+	// else if policy block => geoblocked
+	// else if drm {
+	// 		if prefs disable drm => tell user to enable,
+	// 	    else => hls.js only
+	// } else {
+	// 		restream/progressive audio element
+	//  	js replaces with hls.js if possible
+	// }
+	// also remmeber to show all player settings (?) or combine
+	AutoPlayer string = "auto"
 	// Downloads the HLS stream on the backend, and restreams it to frontend as a file.
 	// If requested MP3 preset, it uses Progressive protocol (so just proxying a file, maybe adding metadata if you need it)
 	// Requires no JS, but less stable client-side (browser likes to randomly unload the audio if you listen to shit on repeat xd)
@@ -70,6 +82,7 @@ const (
 var MP3 = AudioMP3
 var AAC = AudioAAC
 var AACLQ = AudioAACLQ
+var Auto = AutoPlayer
 var Progressive = ProgressivePlayer
 
 type Preferences struct {
@@ -105,8 +118,6 @@ type Preferences struct {
 
 	SearchSuggestions *bool // load search suggestions on main page
 
-	DynamicLoadComments *bool // dynamic comments loader without leaving track page
-
 	KeepPlayerFocus *bool // keep player element in focus
 
 	Waveform *bool // show waveform
@@ -134,7 +145,7 @@ func init() {
 		if !strings.HasPrefix(Repo, "http") {
 			s := strings.Split(Repo, "@")
 			s = strings.Split(s[1], ":")
-			CommitURL = "https://" + s[0] + "/" + s[1]
+			CommitURL = "https://" + strings.Join(s, "/")
 		} else {
 			CommitURL = strings.TrimSuffix(Repo, "/")
 		}
